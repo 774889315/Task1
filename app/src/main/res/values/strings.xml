@@ -1,3 +1,4 @@
-<resources>
+<resources xmlns:ns1="http://schemas.android.com/tools">
     <string name="app_name">MyMusicPlayer</string>
+    <string name="appbar_scrolling_view_behavior" translatable="false">android.support.design.widget.AppBarLayout$ScrollingViewBehavior</string>
 </resources>
