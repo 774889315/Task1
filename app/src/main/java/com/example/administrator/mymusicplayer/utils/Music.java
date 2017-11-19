@@ -1,13 +1,10 @@
-package com.example.administrator.mymusicplayer;
+package com.example.administrator.mymusicplayer.utils;
 
 import android.util.Log;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,9 +15,9 @@ import java.util.List;
 public class Music
 {
     private String location;
-    List<Lyric> lyric;
+    public List<Lyric> lyric;
 
-    Music(String location)
+    public Music(String location)
     {
         this.location = location;
         //找歌词文件是否存在
@@ -34,7 +31,11 @@ public class Music
                 while((line = br.readLine()) != null)
                 {
           //          Log.e("line", line);
-                    lyric.add(new Lyric(line));
+    //                if(line.charAt(0) == '[')
+                    {
+                        lyric.add(new Lyric(line));
+ //                       Log.e("tag0", line);
+                    }
                 }
 
             } catch (Exception e) {
@@ -43,12 +44,12 @@ public class Music
         }
     }
 
-    String getLocation()
+    public String getLocation()
     {
         return location;
     }
 
-    String getName()
+    public String getName()
     {
         return location.substring(location.lastIndexOf("/") + 1);
     }

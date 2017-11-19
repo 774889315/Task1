@@ -1,4 +1,4 @@
-package com.example.administrator.mymusicplayer;
+package com.example.administrator.mymusicplayer.widget;
 
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
@@ -7,8 +7,9 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
-import android.widget.Button;
 import android.widget.RemoteViews;
+
+import com.example.administrator.mymusicplayer.R;
 
 public class AppWidget extends AppWidgetProvider {
 

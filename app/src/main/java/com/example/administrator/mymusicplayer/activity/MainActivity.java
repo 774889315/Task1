@@ -1,6 +1,7 @@
-package com.example.administrator.mymusicplayer;
+package com.example.administrator.mymusicplayer.activity;
 
 import android.Manifest;
+import android.app.FragmentTransaction;
 import android.app.NotificationManager;
 import android.app.TimePickerDialog;
 import android.appwidget.AppWidgetManager;
@@ -9,6 +10,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.graphics.drawable.AnimationDrawable;
 import android.media.MediaPlayer;
 import android.os.Bundle;
@@ -23,7 +25,9 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
+import android.view.GestureDetector;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Animation;
@@ -38,16 +42,34 @@ import android.widget.TextView;
 import android.widget.TimePicker;
 import android.widget.Toast;
 
+import com.example.administrator.mymusicplayer.adapter.LyricAdapter;
+//import com.example.administrator.mymusicplayer.utils.StringEscapeUtils;
+import com.example.administrator.mymusicplayer.fragment.MyFragment;
+import com.example.administrator.mymusicplayer.utils.AllInfo;
+import com.example.administrator.mymusicplayer.utils.Lyric;
+import com.example.administrator.mymusicplayer.utils.Staff;
+import com.example.administrator.mymusicplayer.widget.AppWidget;
+import com.example.administrator.mymusicplayer.utils.Music;
+import com.example.administrator.mymusicplayer.adapter.MyAdapter;
+import com.example.administrator.mymusicplayer.R;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
+
+import com.google.gson.*;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
-
-    static MediaPlayer mp;
+    public static MediaPlayer mp;
     SeekBar sb;
-    Button stop, pause, shift, timer;
-    TextView tv, tv2, now0, lyric;
+    Button stop, pause, shift, timer, get, showList;
+    TextView tv, tv2, now0/*, lyric*/;
     static RecyclerView myList;
+    RecyclerView myLyric;
     static ArrayList<Music> musics;
 
     static int previous = 0;
@@ -66,6 +88,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     final static int RANDOM_CODE = (int) (Math.random() * 65536);
 
     static boolean stopped;
+    boolean showLyric = false;
 
     int state;
     int now;//现在播放的音乐序号
@@ -74,6 +97,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     Thread thread;
 
     static MyAdapter adapter;
+    LyricAdapter lyricAdapter;
 
     private MusicAdapter mMusicAdapter;
 
@@ -112,15 +136,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         case RANDOM:
                             now = (int) (Math.random() * total);
                             play(adapter.list.get(now));
-                            mViewPager.setCurrentItem(now, false);
-                            mMusicAdapter.fragment.get(now).anim.start();
+                            mViewPager.setCurrentItem(now+1, false);
+                            mMusicAdapter.fragment.get(now+1).anim.start();
                             break;
                         case ORDER:
                             now += 1;
                             if (now == total) now = 0;
                             play(adapter.list.get(now));
-                            mViewPager.setCurrentItem(now);
-                            mMusicAdapter.fragment.get(now).anim.start();
+                            mViewPager.setCurrentItem(now+1, false);
+                            mMusicAdapter.fragment.get(now+1).anim.start();
                             break;
                     }
                     break;
@@ -131,6 +155,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     mp.seekTo(0);
                     pause.setText("开始");
                     mMusicAdapter.fragment.get(now).anim.stop();
+                    break;
+                case Integer.MIN_VALUE:
+                    Log.e("tag0", "clicked0");
+                    relativeLayout.setVisibility(View.INVISIBLE);
+                    mViewPager.setVisibility(View.VISIBLE);
+                    reader.setVisibility(View.VISIBLE);
+                    break;
                 default:
                     if (what >= 0) sb.setProgress(what);
                     else {
@@ -151,11 +182,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 tv.setText("00:00/00:00");
                 pause.setText("暂停");
                 play(adapter.list.get(msg.what));
-                mViewPager.setCurrentItem(msg.what);
+                mViewPager.setCurrentItem(msg.what+1, false);
 
             } else {
                 adapter.notifyItemRemoved(-msg.what - 1);
+                new File(adapter.list.get(-msg.what - 1).getLocation()).delete();
                 adapter.list.remove(-msg.what - 1);
+                musics.remove(-msg.what - 1);
             }
         }
     };
@@ -167,9 +200,29 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             {
                 previous = msg.what;
                 Animation anm = AnimationUtils.loadAnimation(MainActivity.this, R.anim.scroll_anim);
-                lyric.setAnimation(anm);
+       //         lyric.setAnimation(anm);
+                myLyric.setAnimation(anm);
                 anm.start();
 
+      //          myLyric.smoothScrollToPosition(msg.what + 1);
+                myLyric.scrollToPosition(msg.what + 1);
+
+                for(int i = 0; i < musics.get(now).lyric.size(); i++)
+                {
+                    if(myLyric.findViewHolderForAdapterPosition(i) == null) continue;
+   //                 Log.e("tag000000", myLyric.findViewHolderForAdapterPosition(i)+"");
+                    TextView tv = (TextView) (myLyric.findViewHolderForLayoutPosition(i).itemView.findViewById(R.id.textView));
+                    tv.setTextSize(18);
+                    tv.setTextColor(Color.rgb(50, 50, 50));
+                }
+
+                if(myLyric.findViewHolderForAdapterPosition(msg.what) == null) return;
+                TextView tv = (TextView) (myLyric.findViewHolderForLayoutPosition(msg.what).itemView.findViewById(R.id.textView));
+                tv.setTextSize(24);
+                tv.setTextColor(Color.rgb(100, 0, 200));
+
+           //     myLyric.
+/*
                 new Thread()
                 {
                     @Override
@@ -185,9 +238,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         scrollHandler.sendMessage(msg0);
 
                     }
-                }.start();
+                }.start();*/
             }
-            else if(musics.get(now).lyric == null) lyric.setText("\n(没有歌词)");
+     //       else if(musics.get(now).lyric == null) lyric.setText("\n(没有歌词)");
             //         Toast.makeText(MainActivity.this, msg.what + "", Toast.LENGTH_SHORT).show();
         }
     };
@@ -196,7 +249,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     {
         @Override
         public void handleMessage(Message msg) {
-            lyric.scrollTo(0, (int) (msg.what * lyric.getLineHeight()));
+ //           lyric.scrollTo(0, (int) (msg.what * lyric.getLineHeight()));
         }
     };
 
@@ -280,6 +333,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         setContentView(R.layout.activity_main);
 
         musics = new ArrayList<>();
+
+        File fileDir = new File("/storage/emulated/0/Music/");
+   //     if(!fileDir.exists()) fileDir.mkdir();
+
+        File file[] = fileDir.listFiles();
+
+        for (int i = 0; i < file.length; i++) {
+            if(!file[i].getName().substring(file[i].getName().lastIndexOf('.')).equals(".lrc") && file[i].getName().charAt(0) != '.')
+                musics.add(new Music(file[i].toString()));
+        }
+
         musics.add(new Music("/storage/emulated/0/test/classicriver.mp3"));
         musics.add(new Music("/storage/emulated/0/test.mp3"));
         musics.add(new Music("/storage/emulated/0/test/snowdreams.wav"));
@@ -324,7 +388,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         tv = (TextView) findViewById(R.id.time);
         tv2 = (TextView) findViewById(R.id.timer_text);
         now0 = (TextView) findViewById(R.id.now);
-        lyric = (TextView) findViewById(R.id.lyric);
+  //      lyric = (TextView) findViewById(R.id.lyric);
 
         stop = (Button) findViewById(R.id.stop);
         stop.setOnClickListener(new View.OnClickListener() {
@@ -394,10 +458,118 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         timer = (Button) findViewById(R.id.timer);
         timer.setOnClickListener(this);
 
-        myList = (RecyclerView) findViewById(R.id.my_list);
-        LinearLayoutManager mLayoutManager = new LinearLayoutManager(this);
-        myList.setLayoutManager(mLayoutManager);
-        myList.setHasFixedSize(true);
+        get = (Button) findViewById(R.id.get);
+        get.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new Thread()
+                {
+                    @Override
+                    public void run()
+                    {
+                        try {
+                            URL url = new URL("http://tingapi.ting.baidu.com/v1/restserver/ting?" +
+                                    "method=baidu.ting.billboard.billList&type=22&size=3&offset=0");
+                            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                            conn.setRequestMethod("GET");
+                            conn.connect();
+                            BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                            StringBuffer sb = new StringBuffer();
+                            String temp;
+                            while((temp = reader.readLine()) != null) sb.append(temp);
+                            reader.close();
+//                            Log.e("tag0", sb.toString()+"\n");
+                            int id[] = getSongId(sb.toString());
+                   //         Log.e("tag0", id[0]+"\t"+id[1]+"\t"+id[2]);
+
+           //                 Lyric[] lyric = new Lyric[id.length];
+
+                            AllInfo info = new AllInfo();
+
+
+                            for(int i = 0; i < id.length; i++)
+                            {
+                                url = new URL("http://tingapi.ting.baidu.com/v1/restserver/ting?" +
+                                        "method=baidu.ting.song.lry&songid=" + id[i]);
+                                conn = (HttpURLConnection) url.openConnection();
+                                conn.setRequestMethod("GET");
+                                conn.connect();
+                                reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+
+
+
+//                                sb = new StringBuffer();
+//                                while((temp = reader.readLine()) != null) sb.append(temp);
+
+      //                          String lyric = getLyric(sb.toString());
+                   //             Log.e("tag0", sb+"");
+
+                                Gson gson = new Gson();
+                                Staff staff = gson.fromJson(reader, Staff.class);
+               //                 Log.e("tag0", staff.getTitle()+"\t"+staff.getLrcContent());
+           //                     lyric[i] = new Lyric(staff.getLrcContent(), true);
+                                info.lyric.add(new Lyric(staff.getLrcContent(), true));
+                                reader.close();
+
+
+
+                                url = new URL("http://ting.baidu.com/data/music/links?songIds={"+id[i]+"}");
+                                conn = (HttpURLConnection) url.openConnection();
+                                conn.setRequestMethod("GET");
+                                conn.connect();
+                                reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+
+
+//
+//                                          sb = new StringBuffer();
+//                                           while((temp = reader.readLine()) != null) sb.append(temp);
+//
+//                                                      Log.e("tag0", sb+"");
+
+                    //            gson = new Gson();
+                                staff = gson.fromJson(reader, Staff.class);
+    //                            Log.e("tag0", staff.getData().getSongList().get(0).getSongLink());
+                                info.link.add(staff.getData().getSongList().get(0).getSongLink());
+                                reader.close();
+
+
+                            }
+
+                            Intent intent = new Intent(MainActivity.this, OnlineActivity.class);
+                            intent.putExtra("allInfo_data", info);
+                            startActivity(intent);
+                        }
+                        catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }.start();
+            }
+        });
+
+        showList = (Button) findViewById(R.id.show_list);
+        showList.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View v) {
+                /*MyFragment fragment = new MyFragment();
+                android.app.FragmentManager fragmentManager = getFragmentManager();
+                FragmentTransaction transaction = fragmentManager.beginTransaction();
+                transaction.replace(R.id.first_fragment, fragment);
+                transaction.commit();*/
+
+                Intent intent = new Intent(MainActivity.this, ListActivity.class);
+                startActivity(intent);
+            }
+        });
+
+
+
+        myLyric = (RecyclerView) findViewById(R.id.my_lyric);
+        LinearLayoutManager mLayoutManager1 = new LinearLayoutManager(this);
+        myLyric.setLayoutManager(mLayoutManager1);
+        myLyric.setHasFixedSize(true);
+
 
         manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 
@@ -407,6 +579,62 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         update(adapter);
         //     Toast.makeText(this, adapter.list.size()+"", Toast.LENGTH_SHORT).show();
 
+        relativeLayout = (RelativeLayout) findViewById(R.id.relative_layout);
+
+        class TapGestureListener extends GestureDetector.SimpleOnGestureListener{
+
+            @Override
+            public boolean onSingleTapConfirmed(MotionEvent e) {
+                relativeLayout.setVisibility(View.VISIBLE);
+                mViewPager.setVisibility(View.INVISIBLE);
+                reader.setVisibility(View.INVISIBLE);
+                return false;
+            }
+        }
+        final GestureDetector tapGestureDetector = new GestureDetector(this, new TapGestureListener());
+
+        mViewPager.setOnTouchListener(new View.OnTouchListener() {
+            public boolean onTouch(View v, MotionEvent event) {
+                tapGestureDetector.onTouchEvent(event);
+                return false;
+            }
+        });
+
+        class TapGestureListener1 extends GestureDetector.SimpleOnGestureListener{
+
+            @Override
+            public boolean onSingleTapConfirmed(MotionEvent e) {
+//                if(!showLyric)
+                {
+                    relativeLayout.setVisibility(View.INVISIBLE);
+                    mViewPager.setVisibility(View.VISIBLE);
+                    reader.setVisibility(View.VISIBLE);
+                    Log.e("tag0", "clicked");
+                }
+                /*else
+                {
+                    relativeLayout.setVisibility(View.VISIBLE);
+                    mViewPager.setVisibility(View.INVISIBLE);
+                    reader.setVisibility(View.INVISIBLE);
+                    return false;
+                }
+                showLyric = !showLyric;*/
+                return false;
+            }
+        }
+        final GestureDetector tapGestureDetector1 = new GestureDetector(this, new TapGestureListener1());
+
+        RelativeLayout layout = (RelativeLayout) findViewById(R.id.relative_layout0);
+
+        layout.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Message msg = new Message();
+                msg.what = Integer.MIN_VALUE;
+                handler.sendMessage(msg);
+            }
+        });
+
         mViewPager.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -415,6 +643,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 reader.setVisibility(View.INVISIBLE);
             }
         });
+
+        mViewPager.setCurrentItem(1);
 
         mViewPager.setOnPageChangeListener(new ViewPager.OnPageChangeListener() {
             @Override
@@ -430,11 +660,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             @Override
             public void onPageSelected(int position) {
+
                 if(mp.isPlaying())
                 {
-                    Message msg = new Message();
-                    msg.what = position;
-                    playHandler.sendMessage(msg);
+//                    final Message msg = new Message();
+//                    msg.what = position;
+//                    playHandler.sendMessage(msg);
+
                     //                animation1.start();
                     //                PlaceholderFragment.animation.start();
                 }
@@ -452,14 +684,24 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         mMusicAdapter.fragment.get(i).anim.stop();
                 }
 
-                if(state == 2 && mp.isPlaying()) //滑动完
+                if(state == 0) //滑动完
                 {
-                    for(int i = 0; i < mMusicAdapter.fragment.size(); i++)
-                        mMusicAdapter.fragment.get(i).anim.start();
+  //                  Log.e("tag0", mViewPager.getCurrentItem()+"");
+                    if(mViewPager.getCurrentItem() == 0) mViewPager.setCurrentItem(adapter.list.size(), false);
+                    else if(mViewPager.getCurrentItem() == adapter.list.size() + 1) mViewPager.setCurrentItem(1, false);
+
+                    if(mp.isPlaying())
+                    {
+                        final Message msg = new Message();
+                        msg.what = mViewPager.getCurrentItem() - 1;
+                        playHandler.sendMessage(msg);
+                        for(int i = 0; i < mMusicAdapter.fragment.size(); i++)
+                            mMusicAdapter.fragment.get(i).anim.start();
+                    }
                 }
             }
         });
-
+/*
         relativeLayout = (RelativeLayout) findViewById(R.id.relative_layout);
   //      tape = (LinearLayout) findViewById(R.id.tape);
 
@@ -473,8 +715,55 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         });
 
+*/
 
+    }
 
+    int[] getSongId(String s)
+    {
+        int loc = s.indexOf("song_id");
+        while(s.charAt(loc) != ':') loc += 1;
+        int number = 0;
+        for(loc += 2; s.charAt(loc) != '\"'; loc++)
+        {
+            number *= 10;
+            number += s.charAt(loc) - '0';
+        }
+
+        loc = s.indexOf("song_id", loc);
+        while(s.charAt(loc) != ':') loc += 1;
+        int number1 = 0;
+        for(loc += 2; s.charAt(loc) != '\"'; loc++)
+        {
+            number1 *= 10;
+            number1 += s.charAt(loc) - '0';
+        }
+
+        loc = s.indexOf("song_id", loc);
+        while(s.charAt(loc) != ':') loc += 1;
+        int number2 = 0;
+        for(loc += 2; s.charAt(loc) != '\"'; loc++)
+        {
+            number2 *= 10;
+            number2 += s.charAt(loc) - '0';
+        }
+        return new int[]{number, number1, number2};
+    }
+
+    String getLyric(String s)
+    {
+        StringBuilder sb = new StringBuilder();
+        int c;
+        int i = s.indexOf("lrcContent");
+        while((c = s.charAt(i)) != ':') i++;
+        i += 2;
+        while((c = s.charAt(i)) != '\"')
+        {
+            sb.append((char)c);
+            i += 1;
+        }
+//        return String.valueOf(sb);
+        return sb.toString();
     }
 
     @Override
@@ -501,6 +790,29 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }.start();
     }
 
+    @Override
+    protected void onResume()
+    {
+        super.onResume();
+        /*musics = new ArrayList<>();
+
+        File fileDir = new File("/storage/emulated/0/Music/");
+        //     if(!fileDir.exists()) fileDir.mkdir();
+
+        File file[] = fileDir.listFiles();
+
+        for(int i = 0; i < file.length; i++)
+        {
+            if(!file[i].getName().substring(file[i].getName().lastIndexOf('.')).equals(".lrc") && file[i].getName().charAt(0) != '.')
+                musics.add(new Music(file[i].getName()));
+        }
+
+        musics.add(new Music("/storage/emulated/0/test/classicriver.mp3"));
+        musics.add(new Music("/storage/emulated/0/test.mp3"));
+        musics.add(new Music("/storage/emulated/0/test/snowdreams.wav"));
+        update(adapter);*/
+    }
+
 
     void update() {
         int c;
@@ -509,7 +821,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     void update(MyAdapter adapter) {
-        myList.setAdapter(adapter);
+  //      myList.setAdapter(adapter);
 
         mMusicAdapter = new MusicAdapter(getSupportFragmentManager());
         mViewPager.setAdapter(mMusicAdapter);
@@ -532,11 +844,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             if(music.lyric != null)
             {
+                /*
                 lyric.setText("\n");
                 for(int i = 0; i < musics.get(now).lyric.size(); i++)
                 {
                     lyric.append(musics.get(now).lyric.get(i).getLyric()+"\n");
                 }
+*/
+                myLyric = (RecyclerView) findViewById(R.id.my_lyric);
+                LinearLayoutManager mLayoutManager1 = new LinearLayoutManager(this);
+                myLyric.setLayoutManager(mLayoutManager1);
+                myLyric.setHasFixedSize(true);
+
+                lyricAdapter = new LyricAdapter(MainActivity.this, music.lyric);
+                myLyric.setAdapter(lyricAdapter);
 
                 thread = new Thread()
                 {
@@ -598,7 +919,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         @Override
         public int getCount() {
-            return musics.size();
+            return musics.size() + 2;
         }
 
         @Override
@@ -638,10 +959,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             anim = (AnimationDrawable) tape.getDrawable();
 
 
-            if(musics.size() > getArguments().getInt(ARG_SECTION_NUMBER))
+//            if(musics.size() > getArguments().getInt(ARG_SECTION_NUMBER))
             {
-                if(musics.get(getArguments().getInt(ARG_SECTION_NUMBER)) == null) name.setText("null");
-                else name.setText(musics.get(getArguments().getInt(ARG_SECTION_NUMBER)).getName());
+//                if(musics.get(getArguments().getInt(ARG_SECTION_NUMBER)) == null) name.setText("null");
+//                else
+                {
+                    if(getArguments().getInt(ARG_SECTION_NUMBER) == 0) name.setText(musics.get(musics.size()-1).getName());
+                    else if(getArguments().getInt(ARG_SECTION_NUMBER) == musics.size()+1) name.setText(musics.get(0).getName());
+                    else name.setText(musics.get(getArguments().getInt(ARG_SECTION_NUMBER)- 1).getName());
+                }
             }
             return rootView;
         }

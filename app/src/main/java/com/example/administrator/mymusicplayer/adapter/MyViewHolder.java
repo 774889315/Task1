@@ -1,9 +1,11 @@
-package com.example.administrator.mymusicplayer;
+package com.example.administrator.mymusicplayer.adapter;
 
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+
+import com.example.administrator.mymusicplayer.R;
 
 /**
  * Created by Administrator on 2017/10/30.

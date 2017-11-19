@@ -1,16 +1,16 @@
-package com.example.administrator.mymusicplayer;
+package com.example.administrator.mymusicplayer.activity;
 
 import android.app.Activity;
 import android.os.Bundle;
 import android.os.Environment;
-import android.provider.ContactsContract;
-import android.support.v4.app.ActivityCompat;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 
+import com.example.administrator.mymusicplayer.utils.Music;
+import com.example.administrator.mymusicplayer.R;
+
 import java.io.File;
-import java.io.FileFilter;
 
 /**
  * Created by Administrator on 2017/10/31.
