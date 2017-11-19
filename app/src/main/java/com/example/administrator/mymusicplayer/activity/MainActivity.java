@@ -59,6 +59,7 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.List;
 
 import com.google.gson.*;
 
@@ -769,6 +770,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onStart() {
         super.onStart();
+
+
         new Thread() {
             @Override
             public void run() {
@@ -893,6 +896,22 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     }
                 };
                 thread.start();
+            }
+
+            else
+            {
+                myLyric = (RecyclerView) findViewById(R.id.my_lyric);
+                LinearLayoutManager mLayoutManager1 = new LinearLayoutManager(this);
+                myLyric.setLayoutManager(mLayoutManager1);
+                myLyric.setHasFixedSize(true);
+
+                List<Lyric> emptyLyric = new ArrayList<>();
+                emptyLyric.add(new Lyric("[00:00.00]无歌词"));
+                emptyLyric.add(new Lyric("[00:00.00]无歌词"));
+                emptyLyric.add(new Lyric("[00:00.00]无歌词"));
+
+                lyricAdapter = new LyricAdapter(MainActivity.this, emptyLyric);
+                myLyric.setAdapter(lyricAdapter);
             }
         }
         catch (Exception e)
